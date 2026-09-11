@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 GITHUB_URL="https://github.com/Kyaa-A/claude-switch"
 
 # ── Paths ──────────────────────────────────────────────────────
@@ -91,6 +91,66 @@ ICO_WARN="⚠"
 ICO_LOCK="🔒"
 ICO_STAR="★"
 
+# ── Claude brand colors (TrueColor with 256-color fallback) ────
+if $SUPPORTS_COLOR; then
+    HAS_TC=false
+    if [[ "${COLORTERM:-}" == "truecolor" || "${COLORTERM:-}" == "24bit" || "${TERM:-}" == *"256color"* || "${TERM:-}" == "xterm-kitty" || "${TERM:-}" == "alacritty" ]]; then
+        HAS_TC=true
+    fi
+
+    if $HAS_TC; then
+        CL0='\033[38;2;245;140;105m' # peach highlight
+        CL1='\033[38;2;240;130;95m'
+        CL2='\033[38;2;235;125;90m'  # coral
+        CL3='\033[38;2;230;120;85m'
+        CL4='\033[38;2;225;115;80m'
+        CL5='\033[38;2;217;119;87m'  # Claude exact (#D97757)
+        CL6='\033[38;2;217;119;87m'  # Claude exact (#D97757)
+        CL7='\033[38;2;210;105;75m'
+        CL8='\033[38;2;200;95;65m'   # terracotta
+        CL9='\033[38;2;190;85;55m'
+        CL10='\033[38;2;180;75;45m'  # deep rust
+        CL11='\033[38;2;170;65;40m'
+        # Shorthands
+        C1='\033[38;2;217;119;87m'   # main brand (#D97757)
+        C2='\033[38;2;235;125;90m'   # bright coral
+        C3='\033[38;2;243;156;107m'  # warm amber
+        C4='\033[38;2;248;180;140m'  # light peach
+        C5='\033[38;2;200;95;65m'    # terracotta
+        C6='\033[38;2;227;141;111m'  # rose coral
+        C7='\033[38;2;180;75;45m'    # rust
+        C8='\033[38;2;143;62;31m'    # dark copper
+        CB='\033[38;2;110;45;20m'    # shadow
+        CW='\033[38;2;255;244;235m'  # warm cream
+    else
+        CL0='\033[38;5;216m'
+        CL1='\033[38;5;215m'
+        CL2='\033[38;5;209m'
+        CL3='\033[38;5;208m'
+        CL4='\033[38;5;208m'
+        CL5='\033[38;5;202m'
+        CL6='\033[38;5;202m'
+        CL7='\033[38;5;202m'
+        CL8='\033[38;5;166m'
+        CL9='\033[38;5;166m'
+        CL10='\033[38;5;130m'
+        CL11='\033[38;5;94m'
+        C1='\033[38;5;202m'
+        C2='\033[38;5;208m'
+        C3='\033[38;5;214m'
+        C4='\033[38;5;215m'
+        C5='\033[38;5;166m'
+        C6='\033[38;5;217m'
+        C7='\033[38;5;209m'
+        C8='\033[38;5;203m'
+        CB='\033[38;5;94m'
+        CW='\033[38;5;230m'
+    fi
+else
+    CL0='' CL1='' CL2='' CL3='' CL4='' CL5='' CL6='' CL7='' CL8='' CL9='' CL10='' CL11=''
+    C1='' C2='' C3='' C4='' C5='' C6='' C7='' C8='' CB='' CW=''
+fi
+
 # ── Helpers ────────────────────────────────────────────────────
 
 ensure_profiles_dir() {
@@ -158,12 +218,18 @@ import json, time
 try:
     with open('$cred_file') as f:
         d = json.load(f)
-    expires = d.get('claudeAiOauth', {}).get('expiresAt', 0)
-    # expiresAt is in milliseconds
+    oauth = d.get('claudeAiOauth', {})
+    ref_expires = oauth.get('refreshTokenExpiresAt', 0)
+    expires = oauth.get('expiresAt', 0)
     now = time.time() * 1000
-    if expires > now:
-        remaining = (expires - now) / 1000 / 86400
-        print(f'valid:{remaining:.0f}d')
+    target = ref_expires if ref_expires > 0 else expires
+    if target > now:
+        remaining_days = (target - now) / 1000 / 86400
+        if remaining_days >= 1:
+            print(f'valid:{remaining_days:.0f}d')
+        else:
+            remaining_hours = (target - now) / 1000 / 3600
+            print(f'valid:{remaining_hours:.0f}h')
     else:
         print('expired')
 except:
@@ -178,33 +244,35 @@ except:
 
 show_banner() {
     echo ""
-    echo -e "${BOLD}${BWHITE}"
-    echo "         _                 _                          _ _       _     "
-    echo "     ___| | __ _ _   _  __| | ___       _____      _(_) |_ ___| |__  "
-    echo "    / __| |/ _\` | | | |/ _\` |/ _ \_____/ __\ \ /\ / / | __/ __| '_ \ "
-    echo "   | (__| | (_| | |_| | (_| |  __/_____\__ \\\\ V  V /| | || (__| | | |"
-    echo "    \___|_|\__,_|\__,_|\__,_|\___|     |___/ \_/\_/ |_|\__\___|_| |_|"
-    echo -e "${RST}"
-    echo -e "               ${BGREEN}${BOLD}[!]${RST} ${DIM}Multi-account manager for Claude Code CLI${RST}"
+    if [[ $TERM_WIDTH -lt 68 ]]; then
+        show_mini_banner
+        return
+    fi
+
+    echo -e "  ${CL0}${BOLD}      ▄██     ▄█▄         ${RST}"
+    echo -e "  ${CL1}${BOLD}      ▀███   ███▀  ▄▄▄    ${RST}  ${C2}${BOLD}CLAUDE-SWITCH${RST}  ${DIM}v${VERSION}${RST}"
+    echo -e "  ${CL2}${BOLD}  ▄██▄ ▀███▄ ███  ████▀   ${RST}  ${DIM}Multi-account manager for Claude Code CLI${RST}"
+    echo -e "  ${CL3}${BOLD}  ▀████▄▀███▄██▀▄███▀     ${RST}  ${DIM}─────────────────────────────────────────${RST}"
+    echo -e "  ${CL4}${BOLD}     ▀▀████████████   ▄▄▄▄${RST}  ${C3}▸${RST} ${DIM}version${RST}   ${CW}${BOLD}${VERSION}${RST} ${DIM}#stable${RST}"
+    echo -e "  ${CL5}${BOLD}▄▄▄▄▄▄▄▄▄████████████████▀${RST}  ${C3}▸${RST} ${DIM}repo${RST}      ${BCYAN}${ULINE}${GITHUB_URL}${RST}"
+    echo -e "  ${CL6}${BOLD} ▀▀▀▀▀▀▀▀▀███████████▄▄▄▄ ${RST}  ${C3}▸${RST} ${DIM}license${RST}   ${WHITE}MIT${RST}"
+    echo -e "  ${CL7}${BOLD}     ▄▄▄███████████▀▀▀▀▀█▀${RST}  ${C3}▸${RST} ${DIM}status${RST}    ${GREEN}●${RST} ${WHITE}ready${RST}"
+    echo -e "  ${CL8}${BOLD}   ▄███▀ ▄███████████▄    ${RST}  ${DIM}─────────────────────────────────────────${RST}"
+    echo -e "  ${CL9}${BOLD}   ▀▀  ▄██▀ ██▀ ███▀▀▀█   ${RST}  ${DIM}Swaps credentials · Zero logout · Pure bash${RST}"
+    echo -e "  ${CL10}${BOLD}      ██▀  ███   ▀██      ${RST}"
+    echo -e "  ${CL11}${BOLD}           ▀██            ${RST}"
     echo ""
-    echo -e "    ${DIM}${BOX_V}${RST} ${GRAY}version${RST}  ${BWHITE}${VERSION}${RST}${GRAY}#stable${RST}"
-    echo -e "    ${DIM}${BOX_V}${RST} ${GRAY}home${RST}     ${BCYAN}${ULINE}${GITHUB_URL}${RST}"
-    echo -e "    ${DIM}${BOX_V}${RST} ${GRAY}license${RST}  ${GRAY}MIT${RST}"
-    echo ""
-    hr "─" "$DIM"
+    echo -e "  ${CL0}━${CL1}━${CL2}━${CL3}━${CL4}━${CL5}━${CL6}━${CL7}━${CL8}━${CL9}━${CL10}━${CL11}━${CL10}━${CL9}━${CL8}━${CL7}━${CL6}━${CL5}━${CL4}━${CL3}━${CL2}━${CL1}━${CL0}━${CL1}━${CL2}━${CL3}━${CL4}━${CL5}━${CL6}━${CL7}━${CL8}━${CL9}━${CL10}━${CL11}━${CL10}━${CL9}━${CL8}━${CL7}━${CL6}━${CL5}━${CL4}━${CL3}━${CL2}━${CL1}━${CL0}━${CL1}━${CL2}━${CL3}━${CL4}━${CL5}━${CL6}━${CL7}━${CL8}━${CL9}━${CL10}━${CL11}━${RST}"
     echo ""
 }
 
 show_mini_banner() {
     echo ""
-    echo -e "${BOLD}${BWHITE}"
-    echo "         _                 _                          _ _       _     "
-    echo "     ___| | __ _ _   _  __| | ___       _____      _(_) |_ ___| |__  "
-    echo "    / __| |/ _\` | | | |/ _\` |/ _ \_____/ __\ \ /\ / / | __/ __| '_ \ "
-    echo "   | (__| | (_| | |_| | (_| |  __/_____\__ \\\\ V  V /| | || (__| | | |"
-    echo "    \___|_|\__,_|\__,_|\__,_|\___|     |___/ \_/\_/ |_|\__\___|_| |_|"
-    echo -e "${RST}"
-    echo -e "               ${BGREEN}${BOLD}[!]${RST} ${DIM}v${VERSION}${RST} ${GRAY}— ${GITHUB_URL}${RST}"
+    echo -e "    ${CL0}${BOLD}   ▄█  █▄   ${RST}  ${C2}${BOLD}claude-switch${RST} ${DIM}v${VERSION}${RST}"
+    echo -e "    ${CL2}${BOLD} ▄▄██████▄▄ ${RST}  ${DIM}Multi-account manager for Claude CLI${RST}"
+    echo -e "    ${CL5}${BOLD}▀▀████████▀▀${RST}  ${BCYAN}${DIM}${GITHUB_URL}${RST}"
+    echo -e "    ${CL8}${BOLD} ▀▀██████▀▀ ${RST}"
+    echo -e "    ${CL10}${BOLD}   ▀█  █▀   ${RST}"
     echo ""
 }
 
@@ -233,14 +301,14 @@ interactive_select() {
 
     # Print prompt
     echo -e "  ${BOLD}${prompt}${RST}"
-    echo -e "  ${DIM}Use ↑↓ arrows to navigate, Enter to select, q to cancel${RST}"
+    echo -e "  ${DIM}Use ↑↓ arrows (or j/k) to navigate, Enter to select, q to cancel${RST}"
     echo ""
 
     # Initial render
     local i
     for ((i = 0; i < count; i++)); do
         if [[ $i -eq $selected ]]; then
-            echo -e "  ${BMAGENTA}${BOLD}${ICO_ARROW} ${options[$i]}${RST}"
+            echo -e "  ${C2}${BOLD}${ICO_ARROW} ${options[$i]}${RST}"
         else
             echo -e "  ${DIM}  ${options[$i]}${RST}"
         fi
@@ -289,7 +357,7 @@ interactive_select() {
 
         for ((i = 0; i < count; i++)); do
             if [[ $i -eq $selected ]]; then
-                echo -e "  ${BMAGENTA}${BOLD}${ICO_ARROW} ${options[$i]}${RST}"
+                echo -e "  ${C2}${BOLD}${ICO_ARROW} ${options[$i]}${RST}"
             else
                 echo -e "  ${DIM}  ${options[$i]}${RST}"
             fi
@@ -347,10 +415,12 @@ print_profile_card() {
     local active_badge=""
     local name_color="$BWHITE"
     local border_color="$DIM"
+    local tree_color="$DIM"
     if [[ "$is_active" == "true" ]]; then
-        active_badge="  ${BGREEN}${BOLD}[ACTIVE]${RST}"
-        name_color="$BGREEN"
-        border_color="$GREEN"
+        active_badge="  ${C2}${BOLD}⚡ ACTIVE${RST}"
+        name_color="$C3"
+        border_color="$C2"
+        tree_color="$C4"
     fi
 
     # Token status badge
@@ -361,15 +431,15 @@ print_profile_card() {
         token_badge="  ${GRAY}[?]${RST}"
     else
         local days="${token_status#valid:}"
-        token_badge="  ${DIM}[${ICO_LOCK} ${days} remaining]${RST}"
+        token_badge="  ${C5}${ICO_LOCK} ${days} remaining${RST}"
     fi
 
     echo -e "    ${border_color}┌$(repeat_char "─" $width)┐${RST}"
     echo -e "    ${border_color}│${RST}  ${name_color}${BOLD}${name}${RST}${active_badge}${token_badge}"
-    echo -e "    ${border_color}│${RST}  ${DIM}├─${RST} ${GRAY}email${RST}  ${BCYAN}${email}${RST}"
-    echo -e "    ${border_color}│${RST}  ${DIM}├─${RST} ${GRAY}plan${RST}   ${BYELLOW}${BOLD}${plan}${RST}"
+    echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}email${RST}  ${BCYAN}${email}${RST}"
+    echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}plan${RST}   ${C3}${BOLD}${plan}${RST}"
     if [[ "$org" != "unknown" && -n "$org" ]]; then
-        echo -e "    ${border_color}│${RST}  ${DIM}└─${RST} ${GRAY}org${RST}    ${DIM}${org}${RST}"
+        echo -e "    ${border_color}│${RST}  ${tree_color}└─${RST} ${C5}org${RST}    ${DIM}${org}${RST}"
     fi
     echo -e "    ${border_color}└$(repeat_char "─" $width)┘${RST}"
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ── claude-switch installer ────────────────────────────────────
-# curl -fsSL https://raw.githubusercontent.com/user/claude-switch/main/install.sh | bash
+# curl -fsSL https://raw.githubusercontent.com/Kyaa-A/claude-switch/main/install.sh | bash
 
 set -euo pipefail
 
@@ -9,13 +9,18 @@ CYAN='\033[36m'
 BOLD='\033[1m'
 DIM='\033[2m'
 RST='\033[0m'
+CLAUDE_ORANGE='\033[38;2;217;119;87m'
 
-REPO_URL="https://raw.githubusercontent.com/user/claude-switch/main/claude-switch"
+REPO_URL="https://raw.githubusercontent.com/Kyaa-A/claude-switch/main/claude-switch"
 INSTALL_DIR="${HOME}/.local/bin"
 INSTALL_PATH="${INSTALL_DIR}/claude-switch"
 
 echo ""
-echo -e "  ${BOLD}${CYAN}⚡ Installing claude-switch${RST}"
+echo -e "    ${CLAUDE_ORANGE}${BOLD}   ▄█  █▄   ${RST}  ${CLAUDE_ORANGE}${BOLD}claude-switch${RST} ${DIM}installer${RST}"
+echo -e "    ${CLAUDE_ORANGE}${BOLD} ▄▄██████▄▄ ${RST}  ${DIM}Multi-account manager for Claude Code CLI${RST}"
+echo -e "    ${CLAUDE_ORANGE}${BOLD}▀▀████████▀▀${RST}  ${CYAN}${DIM}https://github.com/Kyaa-A/claude-switch${RST}"
+echo -e "    ${CLAUDE_ORANGE}${BOLD} ▀▀██████▀▀ ${RST}"
+echo -e "    ${CLAUDE_ORANGE}${BOLD}   ▀█  █▀   ${RST}"
 echo ""
 
 # Create install dir
