@@ -102,10 +102,10 @@ Switching accounts natively is frustrating:
     $ claude --resume
 ```
 
-### Profile Cards with Shared Session Counter (`claude-switch list`)
+#### Profile Cards with Live Usage & Shared Sessions (`claude-switch list`)
 
 ```
-       ▄█  █▄     claude-switch v1.2.0
+       ▄█  █▄     claude-switch v1.3.0
      ▄▄██████▄▄   Multi-account manager for Claude CLI
     ▀▀████████▀▀  https://github.com/Kyaa-A/claude-switch
      ▀▀██████▀▀ 
@@ -113,29 +113,26 @@ Switching accounts natively is frustrating:
 
   🔑 Saved Profiles (2 total)
 
-    ┌────────────────────────────────────────────────────────┐
-    │  work  ⚡ ACTIVE  🔒 26d remaining
-    │  ├─ email   alex@company.com
-    │  ├─ plan    max
-    │  ├─ org     Acme Corp
-    │  └─ resume  shared across all profiles
-    └────────────────────────────────────────────────────────┘
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  work  ⚡ ACTIVE  🔒 26d remaining                                         │
+  │  ├─ email  alex@company.com        │ 5h [█████████░]  87% · in 41m ⚠     │
+  │  ├─ plan   max                     │ wk [█░░░░░░░░░]   8% · in 6d 17h    │
+  │  └─ org    Acme Corp               │ resets 5:40 PM · Fri 10:00 AM       │
+  └──────────────────────────────────────────────────────────────────────────┘
 
-    ┌────────────────────────────────────────────────────────┐
-    │  personal
-    │  ├─ email   alex@gmail.com
-    │  ├─ plan    pro
-    │  ├─ org     Personal Org
-    │  └─ resume  shared across all profiles
-    └────────────────────────────────────────────────────────┘
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  personal  🔒 14d remaining                                               │
+  │  ├─ email  alex@gmail.com          │ 5h [░░░░░░░░░░]   0% · in 5h 0m     │
+  │  └─ plan   pro                     │ wk [██░░░░░░░░]  20% · in 5d 2h     │
+  └──────────────────────────────────────────────────────────────────────────┘
 
-  💬 Shared Sessions: 788 conversations available to /resume
+  💬 Shared Sessions: 793 conversations available to /resume
 ```
 
 ### Session Verification (`claude-switch status`)
 
 ```
-       ▄█  █▄     claude-switch v1.2.0
+       ▄█  █▄     claude-switch v1.3.0
      ▄▄██████▄▄   Multi-account manager for Claude CLI
     ▀▀████████▀▀  https://github.com/Kyaa-A/claude-switch
      ▀▀██████▀▀ 
