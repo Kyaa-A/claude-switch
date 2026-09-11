@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>Seamlessly switch between multiple Claude Code accounts across different companies, clients, or organizations without logging out. Zero dependencies. Pure bash.</b>
+  <b>Switch between multiple Claude Code accounts under any profile name you choose without logging out. Zero dependencies. Pure bash.</b>
 </p>
 
 <p align="center">
@@ -33,24 +33,25 @@
 
 ## 🎯 The Problem
 
-When working across multiple companies, clients, or projects, each organization often provisions its own dedicated Claude Code account or subscription. 
+When working with different organizations, clients, or separate work and personal accounts, you frequently need to use different Claude Code CLI credentials.
 
-Switching between them is painful:
-- Running `/logout` tears down your active CLI session and invalidates local tokens.
-- You must constantly open a browser and re-authenticate every time you change projects.
-- If you're using an account provisioned on your machine without direct access to the web credentials/SSO dashboard, logging out means losing access.
-- Claude CLI has no native support for multi-account or multi-org profiles.
+Switching between accounts with Claude CLI is frustrating:
+- Running `/logout` destroys your current local session and invalidates active credentials.
+- You must constantly re-authenticate in the browser every time you change context.
+- If you were provisioned an account on your machine without direct web dashboard access, logging out risks losing that access permanently.
+- Claude CLI offers no built-in profile naming or profile switching.
 
 ## ⚡ The Solution
 
-`claude-switch` manages secure local credential snapshots and swaps them instantly.
+`claude-switch` lets you save credential snapshots under **any name you choose** (`[name]`), and swap or rename them whenever you want.
 
-- **Zero logout required** — all saved sessions and refresh tokens remain valid
+- **Zero logout required** — all saved sessions and refresh tokens stay intact
+- **Custom profile naming & renaming** — name profiles anything (`work`, `client-a`, `personal`, etc.) and rename anytime
 - **Authentic Claude terminal UI** — recognizable Claude starburst logo in warm terracotta gradients
 - **TrueColor + 256-color** — auto-detects 24-bit RGB with graceful fallbacks
-- **Interactive TUI** — navigate with arrow keys (`↑`/`↓`) or vim keys (`j`/`k`)
-- **Auto-save on switch** — current credentials are automatically backed up before loading a new profile
-- **Session expiry tracking** — monitors refresh token validity so you know when sessions need refreshing
+- **Interactive TUI** — arrow keys (`↑`/`↓`) or vim keys (`j`/`k`) navigation
+- **Auto-save on switch** — current credentials are automatically backed up before switching
+- **Session expiry tracking** — monitors refresh token validity so you know when sessions need renewal
 - **Zero dependencies** — pure bash, works out-of-the-box on Linux & macOS
 
 ---
@@ -80,30 +81,27 @@ Switching between them is painful:
 
   COMMANDS
 
-    save <name>         Save current login as a named profile
-    use [name]          Switch to a saved profile (interactive if no name)
-    list               List all saved profiles with details
-    status             Show active profile + live verification
-    login              Login to a new account and save it
-    delete [name]       Delete a saved profile (interactive if no name)
-    help               Show this help message
+    save <name>          Save current login as a named profile
+    use [name]           Switch to a saved profile (interactive if omitted)
+    list                List all saved profiles with details
+    rename [old] [new]   Rename a saved profile
+    status              Show active profile + live verification
+    login               Login to a new account and save it
+    delete [name]        Delete a saved profile (interactive if omitted)
+    help                Show this help message
 
   QUICK START
 
-    # Step 1: Save current company account
-    $ claude-switch save company1
+    # Step 1: Save current login under any name you want
+    $ claude-switch save <name>
 
-    # Step 2: Login to another company account
+    # Step 2: Login to another account
     $ claude-switch login
 
-    # Step 3: Save second company account
-    $ claude-switch save company2
+    # Step 3: Switch between them anytime
+    $ claude-switch use <name>
 
-    # Step 4: Switch anytime
-    $ claude-switch use company1
-    $ claude-switch use company2
-
-    # Or use interactive mode — just run:
+    # Or launch the interactive arrow-key picker:
     $ claude-switch use
 ```
 
@@ -119,17 +117,17 @@ Switching between them is painful:
   🔑 Saved Profiles (2 total)
 
     ┌────────────────────────────────────────────────────────┐
-    │  company1  ⚡ ACTIVE  🔒 26d remaining
-    │  ├─ email  dev@company1.com
+    │  work  ⚡ ACTIVE  🔒 26d remaining
+    │  ├─ email  alex@company.com
     │  ├─ plan   max
-    │  └─ org    Company One Inc.
+    │  └─ org    Acme Corp
     └────────────────────────────────────────────────────────┘
 
     ┌────────────────────────────────────────────────────────┐
-    │  company2
-    │  ├─ email  eng@company2.io
+    │  personal
+    │  ├─ email  alex@gmail.com
     │  ├─ plan   pro
-    │  └─ org    Company Two Technologies
+    │  └─ org    Personal Org
     └────────────────────────────────────────────────────────┘
 ```
 
@@ -145,14 +143,14 @@ Switching between them is painful:
   ⚡ Current Session
 
     ┌────────────────────────────────────────────────────────┐
-    │  company1  ⚡ ACTIVE  🔒 26d remaining
-    │  ├─ email  dev@company1.com
+    │  work  ⚡ ACTIVE  🔒 26d remaining
+    │  ├─ email  alex@company.com
     │  ├─ plan   max
-    │  └─ org    Company One Inc.
+    │  └─ org    Acme Corp
     └────────────────────────────────────────────────────────┘
 
   [>] Verifying with Claude API...
-  [+] Session is valid — logged in as dev@company1.com
+  [+] Session is valid — logged in as alex@company.com
 ```
 
 ### Interactive Switcher (`claude-switch use`)
@@ -167,9 +165,9 @@ Switching between them is painful:
   ⇄ Select account to switch to:
   Use ↑↓ arrows (or j/k) to navigate, Enter to select, q to cancel
 
-  ❯ company1    dev@company1.com  [max]  (active)
-    company2    eng@company2.io   [pro]
-    personal    me@gmail.com      [max]
+  ❯ work        alex@company.com  [max]  (active)
+    personal    alex@gmail.com    [pro]
+    client      alex@client.io    [team]
 ```
 
 ---
@@ -197,23 +195,22 @@ cp claude-switch ~/.local/bin/
 
 ## 📖 3-Step Setup Guide
 
-### 1. Save your current company account
+### 1. Save your current account under any name
 ```bash
-claude-switch save company1
+claude-switch save [name]
 ```
-*Creates a snapshot of your current credentials.*
+*Creates a snapshot of your current credentials under whatever label you prefer.*
 
-### 2. Login to your other company or personal account
+### 2. Login to your secondary account
 ```bash
 claude-switch login
 ```
-*Safely auto-saves the current session first, launches the login flow, and prompts you for a profile name (e.g. `company2` or `personal`).*
+*Auto-saves your current session first, launches the browser login flow, and prompts you for a profile name (`[name]`).*
 
 ### 3. Switch anytime!
 ```bash
-claude-switch use company1     # switch to company1
-claude-switch use company2     # switch to company2
-claude-switch use              # or open interactive picker with arrow keys!
+claude-switch use [name]       # switch directly by name
+claude-switch use              # or launch the interactive arrow-key picker!
 ```
 
 ---
@@ -226,6 +223,7 @@ claude-switch use              # or open interactive picker with arrow keys!
 | `claude-switch save <name>` | | Save current credentials as a named profile |
 | `claude-switch use [name]` | `switch` | Switch to a profile (interactive picker if omitted) |
 | `claude-switch list` | `ls` | List all profiles with email, plan, and remaining days |
+| `claude-switch rename [old] [new]` | `mv` | Rename an existing profile to any new name |
 | `claude-switch status` | `whoami` | Show active profile and verify token against Claude API |
 | `claude-switch login` | `add` | Safely login to a new account without losing current one |
 | `claude-switch delete [name]` | `rm` | Delete a profile (interactive picker if omitted) |
@@ -246,10 +244,10 @@ Claude CLI stores OAuth credentials in:
 ├── .credentials.json          ← active credentials read by Claude CLI
 └── .profiles/
     ├── .active                ← active profile marker
-    ├── company1/
+    ├── work/
     │   ├── credentials.json   ← backed-up credentials snapshot
     │   └── status.json        ← cached account metadata (email, plan)
-    └── company2/
+    └── personal/
         ├── credentials.json
         └── status.json
 ```
@@ -264,11 +262,14 @@ When you run `claude-switch use <name>`:
 
 ## ❓ Frequently Asked Questions
 
-#### Will switching log out my other company accounts?
+#### Can I name and rename profiles whatever I want?
+**Yes.** Use any name you like: `claude-switch save my-label` and `claude-switch rename old-label new-label`.
+
+#### Will switching log out my other accounts?
 **No.** `claude-switch` never executes `claude auth logout`. It only swaps local token snapshots. All server-side sessions remain active and untouched.
 
-#### Do different company accounts share conversation history?
-**No.** Each company account has its own completely isolated conversation history on Anthropic's servers. Switching accounts ensures no cross-company chat leakage.
+#### Do different accounts share conversation history?
+**No.** Each account has its own isolated conversation history on Anthropic's servers. Switching accounts guarantees zero chat leakage between profiles.
 
 #### How does token expiry work?
 Claude CLI OAuth tokens include a short-lived access token and a long-lived refresh token (~30 days). Claude CLI automatically refreshes the access token when you use it. `claude-switch` monitors the refresh token expiry and warns you when a session needs renewal.

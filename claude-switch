@@ -646,10 +646,10 @@ cmd_list() {
         echo -e "  ${DIM}No profiles saved yet.${RST}"
         echo ""
         echo -e "  ${BOLD}Quick start:${RST}"
-        echo -e "    ${CYAN}1.${RST} ${BOLD}claude-switch save company1${RST}   ${DIM}# save current company session${RST}"
-        echo -e "    ${CYAN}2.${RST} ${BOLD}claude-switch login${RST}           ${DIM}# login to another account${RST}"
-        echo -e "    ${CYAN}3.${RST} ${BOLD}claude-switch save company2${RST}   ${DIM}# save that one too${RST}"
-        echo -e "    ${CYAN}4.${RST} ${BOLD}claude-switch use company1${RST}    ${DIM}# switch anytime!${RST}"
+        echo -e "    ${CYAN}1.${RST} ${BOLD}claude-switch save <name>${RST}    ${DIM}# save current session under any name${RST}"
+        echo -e "    ${CYAN}2.${RST} ${BOLD}claude-switch login${RST}          ${DIM}# login to another account${RST}"
+        echo -e "    ${CYAN}3.${RST} ${BOLD}claude-switch save <name>${RST}    ${DIM}# save that one under any name${RST}"
+        echo -e "    ${CYAN}4.${RST} ${BOLD}claude-switch use <name>${RST}     ${DIM}# switch anytime!${RST}"
         echo ""
         return
     fi
@@ -782,6 +782,69 @@ cmd_delete() {
     echo ""
 }
 
+cmd_rename() {
+    local old_name="${1:-}"
+    local new_name="${2:-}"
+
+    show_mini_banner
+    ensure_profiles_dir
+
+    local profile_arr=()
+    read -ra profile_arr <<< "$(get_profile_names)"
+
+    if [[ ${#profile_arr[@]} -eq 0 ]]; then
+        msg_warn "No profiles to rename"
+        exit 0
+    fi
+
+    if [[ -z "$old_name" ]]; then
+        local display_options=()
+        for p in "${profile_arr[@]}"; do
+            get_profile_info "$p"
+            display_options+=("${BOLD}${p}${RST}  ${DIM}${PROF_EMAIL}${RST}")
+        done
+
+        if interactive_select "${ICO_STAR} Select profile to rename:" "${display_options[@]}"; then
+            old_name="${profile_arr[$SELECTED_INDEX]}"
+        else
+            exit 0
+        fi
+    fi
+
+    local old_dir="$PROFILES_DIR/$old_name"
+    if [[ ! -d "$old_dir" ]]; then
+        msg_error "Profile ${BOLD}'$old_name'${RST} not found!"
+        exit 1
+    fi
+
+    if [[ -z "$new_name" ]]; then
+        echo ""
+        new_name=$(input_prompt "New name for '${old_name}'" "")
+        if [[ -z "$new_name" ]]; then
+            msg_error "New profile name cannot be empty"
+            exit 1
+        fi
+    fi
+
+    local new_dir="$PROFILES_DIR/$new_name"
+    if [[ -d "$new_dir" ]]; then
+        msg_error "Profile ${BOLD}'$new_name'${RST} already exists!"
+        exit 1
+    fi
+
+    mv "$old_dir" "$new_dir"
+
+    local active
+    active=$(get_active_profile)
+    if [[ "$old_name" == "$active" ]]; then
+        echo "$new_name" > "$ACTIVE_FILE"
+    fi
+
+    echo ""
+    msg_success "Renamed profile ${BOLD}'$old_name'${RST} to ${BOLD}${BGREEN}'$new_name'${RST}"
+    echo ""
+}
+
 cmd_login() {
     show_mini_banner
 
@@ -829,30 +892,27 @@ cmd_help() {
     echo ""
     echo -e "  ${BOLD}COMMANDS${RST}"
     echo ""
-    echo -e "    ${BCYAN}save${RST} ${DIM}<name>${RST}         Save current login as a named profile"
-    echo -e "    ${BCYAN}use${RST} ${DIM}[name]${RST}          Switch to a saved profile (interactive if no name)"
-    echo -e "    ${BCYAN}list${RST}               List all saved profiles with details"
-    echo -e "    ${BCYAN}status${RST}             Show active profile + live verification"
-    echo -e "    ${BCYAN}login${RST}              Login to a new account and save it"
-    echo -e "    ${BCYAN}delete${RST} ${DIM}[name]${RST}       Delete a saved profile (interactive if no name)"
-    echo -e "    ${BCYAN}help${RST}               Show this help message"
+    echo -e "    ${BCYAN}save${RST} ${DIM}<name>${RST}          Save current login as a named profile"
+    echo -e "    ${BCYAN}use${RST} ${DIM}[name]${RST}           Switch to a saved profile (interactive if omitted)"
+    echo -e "    ${BCYAN}list${RST}                List all saved profiles with details"
+    echo -e "    ${BCYAN}rename${RST} ${DIM}[old] [new]${RST}   Rename a saved profile"
+    echo -e "    ${BCYAN}status${RST}              Show active profile + live verification"
+    echo -e "    ${BCYAN}login${RST}               Login to a new account and save it"
+    echo -e "    ${BCYAN}delete${RST} ${DIM}[name]${RST}        Delete a saved profile (interactive if omitted)"
+    echo -e "    ${BCYAN}help${RST}                Show this help message"
     echo ""
     echo -e "  ${BOLD}QUICK START${RST}"
     echo ""
-    echo -e "    ${GRAY}# Step 1: Save current company session${RST}"
-    echo -e "    ${GREEN}\$${RST} claude-switch save company1"
+    echo -e "    ${GRAY}# Step 1: Save current login under any name you want${RST}"
+    echo -e "    ${GREEN}\$${RST} claude-switch save <name>"
     echo ""
     echo -e "    ${GRAY}# Step 2: Login to another account${RST}"
     echo -e "    ${GREEN}\$${RST} claude-switch login"
     echo ""
-    echo -e "    ${GRAY}# Step 3: Save that one too${RST}"
-    echo -e "    ${GREEN}\$${RST} claude-switch save company2"
+    echo -e "    ${GRAY}# Step 3: Switch between them anytime${RST}"
+    echo -e "    ${GREEN}\$${RST} claude-switch use <name>"
     echo ""
-    echo -e "    ${GRAY}# Step 4: Switch anytime${RST}"
-    echo -e "    ${GREEN}\$${RST} claude-switch use company1"
-    echo -e "    ${GREEN}\$${RST} claude-switch use company2"
-    echo ""
-    echo -e "    ${GRAY}# Or use interactive mode — just run:${RST}"
+    echo -e "    ${GRAY}# Or launch the interactive arrow-key picker:${RST}"
     echo -e "    ${GREEN}\$${RST} claude-switch use"
     echo ""
     echo -e "  ${BOLD}HOW IT WORKS${RST}"
@@ -873,6 +933,7 @@ cmd_interactive() {
         "${ICO_KEY}  Save current session"
         "${ICO_USER}  Login new account"
         "${ICO_DOT}  List all profiles"
+        "${ICO_STAR}  Rename a profile"
         "${ICO_BOLT}  Check status"
         "${ICO_CROSS}  Delete a profile"
     )
@@ -884,8 +945,9 @@ cmd_interactive() {
             1) cmd_save ;;
             2) cmd_login ;;
             3) cmd_list ;;
-            4) cmd_status ;;
-            5) cmd_delete ;;
+            4) cmd_rename ;;
+            5) cmd_status ;;
+            6) cmd_delete ;;
         esac
     fi
 }
@@ -897,6 +959,7 @@ main() {
         save)          cmd_save "${2:-}" ;;
         use|switch)    cmd_use "${2:-}" ;;
         list|ls)       cmd_list ;;
+        rename|mv)     cmd_rename "${2:-}" "${3:-}" ;;
         status|whoami) cmd_status ;;
         delete|rm)     cmd_delete "${2:-}" ;;
         login|add)     cmd_login ;;
