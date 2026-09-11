@@ -48,7 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/user/claude-switch/main/install.sh 
 Or manually:
 
 ```bash
-git clone https://github.com/user/claude-switch.git
+git clone https://github.com/Kyaa-A/claude-switch.git
 cd claude-switch
 chmod +x claude-switch
 sudo ln -sf "$(pwd)/claude-switch" /usr/local/bin/claude-switch
