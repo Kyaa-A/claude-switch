@@ -438,11 +438,12 @@ print_profile_card() {
     echo -e "    ${border_color}┌$(repeat_char "─" $width)┐${RST}"
     echo -e "    ${border_color}│${RST}  ${name_color}${BOLD}${name}${RST}${active_badge}${token_badge}"
     echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}email${RST}   ${BCYAN}${email}${RST}"
-    echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}plan${RST}    ${C3}${BOLD}${plan}${RST}"
     if [[ "$org" != "unknown" && -n "$org" ]]; then
-        echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}org${RST}     ${DIM}${org}${RST}"
+        echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}plan${RST}    ${C3}${BOLD}${plan}${RST}"
+        echo -e "    ${border_color}│${RST}  ${tree_color}└─${RST} ${C5}org${RST}     ${DIM}${org}${RST}"
+    else
+        echo -e "    ${border_color}│${RST}  ${tree_color}└─${RST} ${C5}plan${RST}    ${C3}${BOLD}${plan}${RST}"
     fi
-    echo -e "    ${border_color}│${RST}  ${tree_color}└─${RST} ${C5}resume${RST}  ${BGREEN}shared across all profiles${RST}"
     echo -e "    ${border_color}└$(repeat_char "─" $width)┘${RST}"
 }
 
