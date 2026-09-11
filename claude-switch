@@ -1,0 +1,828 @@
+#!/usr/bin/env bash
+# ╔═══════════════════════════════════════════════════════════════╗
+# ║  claude-switch — Multi-account manager for Claude Code CLI   ║
+# ║  https://github.com/user/claude-switch                       ║
+# ╚═══════════════════════════════════════════════════════════════╝
+#
+# Switch between multiple Claude CLI accounts without logging out.
+# Zero dependencies. Pure bash. Works everywhere.
+
+set -euo pipefail
+
+VERSION="1.0.0"
+
+# ── Paths ──────────────────────────────────────────────────────
+CLAUDE_DIR="$HOME/.claude"
+CRED_FILE="$CLAUDE_DIR/.credentials.json"
+PROFILES_DIR="$CLAUDE_DIR/.profiles"
+ACTIVE_FILE="$PROFILES_DIR/.active"
+
+# ── Terminal capabilities ──────────────────────────────────────
+TERM_WIDTH=$(tput cols 2>/dev/null || echo 60)
+SUPPORTS_COLOR=true
+if [[ ! -t 1 ]] || [[ "${NO_COLOR:-}" == "1" ]]; then
+    SUPPORTS_COLOR=false
+fi
+
+# ── Colors & Styles ────────────────────────────────────────────
+if $SUPPORTS_COLOR; then
+    RST='\033[0m'
+    BOLD='\033[1m'
+    DIM='\033[2m'
+    ITALIC='\033[3m'
+    ULINE='\033[4m'
+    # Foreground
+    BLACK='\033[30m'
+    RED='\033[31m'
+    GREEN='\033[32m'
+    YELLOW='\033[33m'
+    BLUE='\033[34m'
+    MAGENTA='\033[35m'
+    CYAN='\033[36m'
+    WHITE='\033[37m'
+    GRAY='\033[90m'
+    # Bright
+    BRED='\033[91m'
+    BGREEN='\033[92m'
+    BYELLOW='\033[93m'
+    BBLUE='\033[94m'
+    BMAGENTA='\033[95m'
+    BCYAN='\033[96m'
+    BWHITE='\033[97m'
+    # Background
+    BG_BLACK='\033[40m'
+    BG_RED='\033[41m'
+    BG_GREEN='\033[42m'
+    BG_BLUE='\033[44m'
+    BG_MAGENTA='\033[45m'
+    BG_CYAN='\033[46m'
+    BG_WHITE='\033[47m'
+    BG_GRAY='\033[100m'
+    # Cursor
+    HIDE_CURSOR='\033[?25l'
+    SHOW_CURSOR='\033[?25h'
+    CLEAR_LINE='\033[2K'
+    MOVE_UP='\033[A'
+else
+    RST='' BOLD='' DIM='' ITALIC='' ULINE=''
+    BLACK='' RED='' GREEN='' YELLOW='' BLUE='' MAGENTA='' CYAN='' WHITE='' GRAY=''
+    BRED='' BGREEN='' BYELLOW='' BBLUE='' BMAGENTA='' BCYAN='' BWHITE=''
+    BG_BLACK='' BG_RED='' BG_GREEN='' BG_BLUE='' BG_MAGENTA='' BG_CYAN='' BG_WHITE='' BG_GRAY=''
+    HIDE_CURSOR='' SHOW_CURSOR='' CLEAR_LINE='' MOVE_UP=''
+fi
+
+# ── Box-drawing characters ─────────────────────────────────────
+BOX_TL="╭" BOX_TR="╮" BOX_BL="╰" BOX_BR="╯"
+BOX_H="─" BOX_V="│"
+BOX_LT="├" BOX_RT="┤"
+
+# ── Icons ──────────────────────────────────────────────────────
+ICO_CHECK="✔"
+ICO_CROSS="✘"
+ICO_ARROW="❯"
+ICO_DOT="●"
+ICO_RING="○"
+ICO_BOLT="⚡"
+ICO_KEY="🔑"
+ICO_USER="👤"
+ICO_SWAP="⇄"
+ICO_WARN="⚠"
+ICO_LOCK="🔒"
+ICO_STAR="★"
+
+# ── Helpers ────────────────────────────────────────────────────
+
+ensure_profiles_dir() {
+    mkdir -p "$PROFILES_DIR"
+}
+
+get_active_profile() {
+    if [[ -f "$ACTIVE_FILE" ]]; then
+        cat "$ACTIVE_FILE"
+    else
+        echo ""
+    fi
+}
+
+# Repeat a string N times
+repeat_char() {
+    local char="$1" count="$2"
+    printf "%0.s${char}" $(seq 1 "$count")
+}
+
+# Print centered text
+center() {
+    local text="$1" width="${2:-$TERM_WIDTH}"
+    # Strip ANSI codes to get real length
+    local stripped
+    stripped=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+    local len=${#stripped}
+    local pad=$(( (width - len) / 2 ))
+    [[ $pad -lt 0 ]] && pad=0
+    printf "%${pad}s" ""
+    echo -e "$text"
+}
+
+# Draw a horizontal rule
+hr() {
+    local char="${1:-─}" color="${2:-$DIM}"
+    local width=$((TERM_WIDTH > 60 ? 60 : TERM_WIDTH))
+    echo -e "${color}$(repeat_char "$char" "$width")${RST}"
+}
+
+# Extract field from JSON using python3 (available on most systems)
+json_get() {
+    local file="$1" field="$2" default="${3:-unknown}"
+    if [[ -f "$file" ]] && command -v python3 &>/dev/null; then
+        python3 -c "
+import json
+try:
+    with open('$file') as f:
+        d = json.load(f)
+    print(d.get('$field', '$default'))
+except:
+    print('$default')
+" 2>/dev/null
+    else
+        echo "$default"
+    fi
+}
+
+# Check if credentials are still valid (token not expired)
+check_token_valid() {
+    local cred_file="$1"
+    if [[ -f "$cred_file" ]] && command -v python3 &>/dev/null; then
+        python3 -c "
+import json, time
+try:
+    with open('$cred_file') as f:
+        d = json.load(f)
+    expires = d.get('claudeAiOauth', {}).get('expiresAt', 0)
+    # expiresAt is in milliseconds
+    now = time.time() * 1000
+    if expires > now:
+        remaining = (expires - now) / 1000 / 86400
+        print(f'valid:{remaining:.0f}d')
+    else:
+        print('expired')
+except:
+    print('unknown')
+" 2>/dev/null
+    else
+        echo "unknown"
+    fi
+}
+
+# ── Banner ─────────────────────────────────────────────────────
+
+show_banner() {
+    echo ""
+    echo -e "${BMAGENTA}${BOLD}"
+    center "       __                __                         _ __       __  "
+    center "  ____/ /___ ___  ______/ /__        ______      __(_) /______/ /_ "
+    center " / __/ / __ \`/ / / / __  / _ \\______/ ___/ | /| / / / __/ __/ __ \\"
+    center "/ /_/ / /_/ / /_/ / /_/ /  __/_____/\\__ \\| |/ |/ / / /_/ /_/ / / /"
+    center "\\__,_/\\__,_/\\__,_/\\__,_/\\___/     /____/|__/|__/_/\\__/\\__/_/ /_/ "
+    echo -e "${RST}"
+    center "${DIM}Multi-account manager for Claude Code CLI ${GRAY}v${VERSION}${RST}"
+    echo ""
+}
+
+show_mini_banner() {
+    echo ""
+    echo -e "  ${BMAGENTA}${BOLD}claude-switch${RST} ${DIM}v${VERSION}${RST}"
+    echo ""
+}
+
+# ── Interactive Menu ───────────────────────────────────────────
+
+# Pure bash interactive selector with arrow keys
+# Usage: interactive_select "prompt" options[@]
+# Returns: selected index in $SELECTED_INDEX, value in $SELECTED_VALUE
+interactive_select() {
+    local prompt="$1"
+    shift
+    local options=("$@")
+    local count=${#options[@]}
+    local selected=0
+
+    if [[ $count -eq 0 ]]; then
+        echo -e "  ${RED}${ICO_CROSS} No options available${RST}"
+        return 1
+    fi
+
+    # Hide cursor
+    echo -ne "$HIDE_CURSOR"
+
+    # Trap to restore cursor on exit
+    trap 'echo -ne "$SHOW_CURSOR"' EXIT INT TERM
+
+    # Print prompt
+    echo -e "  ${BOLD}${prompt}${RST}"
+    echo -e "  ${DIM}Use ↑↓ arrows to navigate, Enter to select, q to cancel${RST}"
+    echo ""
+
+    # Initial render
+    local i
+    for ((i = 0; i < count; i++)); do
+        if [[ $i -eq $selected ]]; then
+            echo -e "  ${BMAGENTA}${BOLD}${ICO_ARROW} ${options[$i]}${RST}"
+        else
+            echo -e "  ${DIM}  ${options[$i]}${RST}"
+        fi
+    done
+
+    # Read input loop
+    while true; do
+        # Read single keypress
+        IFS= read -rsn1 key
+
+        case "$key" in
+            $'\x1b')
+                # Escape sequence (arrow key)
+                read -rsn2 -t 0.01 rest
+                case "$rest" in
+                    '[A') # Up
+                        ((selected > 0)) && ((selected--))
+                        ;;
+                    '[B') # Down
+                        ((selected < count - 1)) && ((selected++))
+                        ;;
+                esac
+                ;;
+            'k') # vim up
+                ((selected > 0)) && ((selected--))
+                ;;
+            'j') # vim down
+                ((selected < count - 1)) && ((selected++))
+                ;;
+            '') # Enter
+                break
+                ;;
+            'q'|'Q') # Quit
+                echo -ne "$SHOW_CURSOR"
+                # Move cursor past the menu
+                echo ""
+                echo -e "  ${DIM}Cancelled${RST}"
+                return 1
+                ;;
+        esac
+
+        # Redraw: move up and overwrite
+        for ((i = 0; i < count; i++)); do
+            echo -ne "\033[A${CLEAR_LINE}"
+        done
+
+        for ((i = 0; i < count; i++)); do
+            if [[ $i -eq $selected ]]; then
+                echo -e "  ${BMAGENTA}${BOLD}${ICO_ARROW} ${options[$i]}${RST}"
+            else
+                echo -e "  ${DIM}  ${options[$i]}${RST}"
+            fi
+        done
+    done
+
+    # Show cursor
+    echo -ne "$SHOW_CURSOR"
+    echo ""
+
+    SELECTED_INDEX=$selected
+    SELECTED_VALUE="${options[$selected]}"
+    return 0
+}
+
+# Simple text input prompt
+input_prompt() {
+    local prompt="$1" default="${2:-}"
+    local result
+
+    if [[ -n "$default" ]]; then
+        echo -ne "  ${BOLD}${prompt}${RST} ${DIM}(${default})${RST}: "
+    else
+        echo -ne "  ${BOLD}${prompt}${RST}: "
+    fi
+    read -r result
+    if [[ -z "$result" && -n "$default" ]]; then
+        result="$default"
+    fi
+    echo "$result"
+}
+
+# Confirmation prompt
+confirm() {
+    local prompt="$1" default="${2:-y}"
+    local yn
+
+    if [[ "$default" == "y" ]]; then
+        echo -ne "  ${BOLD}${prompt}${RST} ${DIM}[Y/n]${RST}: "
+    else
+        echo -ne "  ${BOLD}${prompt}${RST} ${DIM}[y/N]${RST}: "
+    fi
+    read -r yn
+    yn="${yn:-$default}"
+    [[ "$yn" =~ ^[Yy] ]]
+}
+
+# ── Pretty output helpers ─────────────────────────────────────
+
+# Print a profile card
+print_profile_card() {
+    local name="$1" email="$2" plan="$3" org="$4" is_active="$5" token_status="$6"
+    local width=56
+
+    local active_badge=""
+    local name_color="$BWHITE"
+    local border_color="$DIM"
+    if [[ "$is_active" == "true" ]]; then
+        active_badge=" ${BG_GREEN}${BLACK}${BOLD} ACTIVE ${RST}"
+        name_color="$BGREEN"
+        border_color="$GREEN"
+    fi
+
+    # Token status badge
+    local token_badge=""
+    if [[ "$token_status" == expired ]]; then
+        token_badge=" ${BG_RED}${WHITE}${BOLD} EXPIRED ${RST}"
+    elif [[ "$token_status" == unknown ]]; then
+        token_badge=" ${BG_GRAY}${WHITE} ? ${RST}"
+    else
+        local days="${token_status#valid:}"
+        token_badge=" ${DIM}${ICO_LOCK} ${days} left${RST}"
+    fi
+
+    echo -e "  ${border_color}${BOX_TL}$(repeat_char "$BOX_H" $width)${BOX_TR}${RST}"
+    echo -e "  ${border_color}${BOX_V}${RST}  ${name_color}${BOLD}${ICO_USER} ${name}${RST}${active_badge}${token_badge}"
+    echo -e "  ${border_color}${BOX_V}${RST}  ${DIM}Email${RST}  ${CYAN}${email}${RST}"
+    echo -e "  ${border_color}${BOX_V}${RST}  ${DIM}Plan${RST}   ${BYELLOW}${plan}${RST}"
+    if [[ "$org" != "unknown" && -n "$org" ]]; then
+        echo -e "  ${border_color}${BOX_V}${RST}  ${DIM}Org${RST}    ${GRAY}${org}${RST}"
+    fi
+    echo -e "  ${border_color}${BOX_BL}$(repeat_char "$BOX_H" $width)${BOX_BR}${RST}"
+}
+
+# Status message helpers
+msg_success() { echo -e "  ${GREEN}${ICO_CHECK}${RST}  $*"; }
+msg_error()   { echo -e "  ${RED}${ICO_CROSS}${RST}  $*" >&2; }
+msg_warn()    { echo -e "  ${YELLOW}${ICO_WARN}${RST}  $*"; }
+msg_info()    { echo -e "  ${BLUE}${ICO_DOT}${RST}  $*"; }
+msg_step()    { echo -e "  ${MAGENTA}${ICO_ARROW}${RST}  $*"; }
+
+# Spinner for async operations
+spinner() {
+    local pid="$1" message="${2:-Loading}"
+    local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local i=0
+
+    echo -ne "$HIDE_CURSOR"
+    while kill -0 "$pid" 2>/dev/null; do
+        echo -ne "\r  ${MAGENTA}${frames[$i]}${RST} ${message}..."
+        i=$(( (i + 1) % ${#frames[@]} ))
+        sleep 0.08
+    done
+    echo -ne "\r${CLEAR_LINE}"
+    echo -ne "$SHOW_CURSOR"
+}
+
+# ── Profile helpers ────────────────────────────────────────────
+
+get_profile_names() {
+    local profiles=()
+    if [[ -d "$PROFILES_DIR" ]]; then
+        for dir in "$PROFILES_DIR"/*/; do
+            [[ -d "$dir" ]] || continue
+            profiles+=("$(basename "$dir")")
+        done
+    fi
+    echo "${profiles[@]}"
+}
+
+get_profile_info() {
+    local name="$1"
+    local status_file="$PROFILES_DIR/$name/status.json"
+    local cred_file="$PROFILES_DIR/$name/credentials.json"
+
+    PROF_EMAIL=$(json_get "$status_file" "email" "unknown")
+    PROF_PLAN=$(json_get "$status_file" "subscriptionType" "unknown")
+    PROF_ORG=$(json_get "$status_file" "orgName" "unknown")
+    PROF_TOKEN=$(check_token_valid "$cred_file")
+}
+
+# ── Commands ───────────────────────────────────────────────────
+
+cmd_save() {
+    local name="${1:-}"
+
+    show_mini_banner
+
+    if [[ -z "$name" ]]; then
+        # Interactive: ask for profile name
+        echo -e "  ${BOLD}Save current session as a profile${RST}"
+        echo ""
+        name=$(input_prompt "${ICO_KEY} Profile name")
+        if [[ -z "$name" ]]; then
+            msg_error "Profile name cannot be empty"
+            exit 1
+        fi
+    fi
+
+    ensure_profiles_dir
+
+    if [[ ! -f "$CRED_FILE" ]]; then
+        msg_error "No credentials found at ${ULINE}${CRED_FILE}${RST}"
+        msg_info "Login first: ${BOLD}claude auth login${RST}"
+        exit 1
+    fi
+
+    # Check if profile already exists
+    local profile_dir="$PROFILES_DIR/$name"
+    if [[ -d "$profile_dir" ]]; then
+        echo ""
+        msg_warn "Profile ${BOLD}'$name'${RST} already exists"
+        if ! confirm "Overwrite?" "y"; then
+            echo ""
+            msg_info "Cancelled"
+            exit 0
+        fi
+    fi
+
+    mkdir -p "$profile_dir"
+
+    # Copy credentials
+    cp "$CRED_FILE" "$profile_dir/credentials.json"
+
+    # Save auth status
+    if command -v claude &>/dev/null; then
+        claude auth status --json 2>/dev/null > "$profile_dir/status.json" || true
+    fi
+
+    # Mark as active
+    echo "$name" > "$ACTIVE_FILE"
+
+    echo ""
+    msg_success "Profile ${BOLD}${BGREEN}'$name'${RST} saved!"
+    echo ""
+
+    # Show card
+    get_profile_info "$name"
+    print_profile_card "$name" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "true" "$PROF_TOKEN"
+    echo ""
+}
+
+cmd_use() {
+    local name="${1:-}"
+
+    show_mini_banner
+    ensure_profiles_dir
+
+    # Get available profiles
+    local profile_arr=()
+    read -ra profile_arr <<< "$(get_profile_names)"
+
+    if [[ ${#profile_arr[@]} -eq 0 ]]; then
+        msg_warn "No profiles saved yet"
+        echo ""
+        msg_info "Save your current session first:"
+        echo -e "    ${BOLD}claude-switch save <name>${RST}"
+        exit 1
+    fi
+
+    local active
+    active=$(get_active_profile)
+
+    if [[ -z "$name" ]]; then
+        # Interactive mode: show selection menu
+        local display_options=()
+        for p in "${profile_arr[@]}"; do
+            get_profile_info "$p"
+            local marker=""
+            if [[ "$p" == "$active" ]]; then
+                marker=" ${GREEN}(active)${RST}"
+            fi
+            display_options+=("${BOLD}${p}${RST}  ${DIM}${PROF_EMAIL}  [${PROF_PLAN}]${RST}${marker}")
+        done
+
+        if interactive_select "${ICO_SWAP} Select account to switch to:" "${display_options[@]}"; then
+            name="${profile_arr[$SELECTED_INDEX]}"
+        else
+            exit 0
+        fi
+    fi
+
+    # Validate profile exists
+    local profile_dir="$PROFILES_DIR/$name"
+    if [[ ! -f "$profile_dir/credentials.json" ]]; then
+        msg_error "Profile ${BOLD}'$name'${RST} not found!"
+        echo ""
+        cmd_list_compact
+        exit 1
+    fi
+
+    # Already active?
+    if [[ "$name" == "$active" ]]; then
+        msg_info "Already on profile ${BOLD}'$name'${RST}"
+        exit 0
+    fi
+
+    # Auto-save current credentials before switching
+    if [[ -n "$active" && -f "$CRED_FILE" ]]; then
+        local current_dir="$PROFILES_DIR/$active"
+        mkdir -p "$current_dir"
+        cp "$CRED_FILE" "$current_dir/credentials.json"
+        if command -v claude &>/dev/null; then
+            claude auth status --json 2>/dev/null > "$current_dir/status.json" || true
+        fi
+        msg_info "Auto-saved current profile '${BOLD}${active}${RST}'"
+    fi
+
+    # Switch
+    cp "$profile_dir/credentials.json" "$CRED_FILE"
+    echo "$name" > "$ACTIVE_FILE"
+
+    echo ""
+    msg_success "Switched to ${BOLD}${BGREEN}'$name'${RST}!"
+    echo ""
+
+    # Show card
+    get_profile_info "$name"
+    print_profile_card "$name" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "true" "$PROF_TOKEN"
+    echo ""
+}
+
+cmd_list() {
+    show_mini_banner
+    ensure_profiles_dir
+
+    local active
+    active=$(get_active_profile)
+
+    local profile_arr=()
+    read -ra profile_arr <<< "$(get_profile_names)"
+
+    if [[ ${#profile_arr[@]} -eq 0 ]]; then
+        echo -e "  ${DIM}No profiles saved yet.${RST}"
+        echo ""
+        echo -e "  ${BOLD}Quick start:${RST}"
+        echo -e "    ${CYAN}1.${RST} ${BOLD}claude-switch save boss${RST}       ${DIM}# save current session${RST}"
+        echo -e "    ${CYAN}2.${RST} ${BOLD}claude auth login${RST}             ${DIM}# login to another account${RST}"
+        echo -e "    ${CYAN}3.${RST} ${BOLD}claude-switch save personal${RST}   ${DIM}# save that one too${RST}"
+        echo -e "    ${CYAN}4.${RST} ${BOLD}claude-switch use boss${RST}        ${DIM}# switch anytime!${RST}"
+        echo ""
+        return
+    fi
+
+    echo -e "  ${BOLD}${ICO_KEY} Saved Profiles${RST} ${DIM}(${#profile_arr[@]} total)${RST}"
+    echo ""
+
+    for pname in "${profile_arr[@]}"; do
+        local is_active="false"
+        [[ "$pname" == "$active" ]] && is_active="true"
+
+        get_profile_info "$pname"
+        print_profile_card "$pname" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "$is_active" "$PROF_TOKEN"
+        echo ""
+    done
+}
+
+cmd_list_compact() {
+    local active
+    active=$(get_active_profile)
+
+    local profile_arr=()
+    read -ra profile_arr <<< "$(get_profile_names)"
+
+    echo -e "  ${BOLD}Available profiles:${RST}"
+    for pname in "${profile_arr[@]}"; do
+        local marker="  ${DIM}${ICO_RING}${RST}"
+        [[ "$pname" == "$active" ]] && marker="  ${GREEN}${ICO_DOT}${RST}"
+
+        get_profile_info "$pname"
+        echo -e "  ${marker} ${BOLD}${pname}${RST}  ${DIM}${PROF_EMAIL}${RST}"
+    done
+}
+
+cmd_status() {
+    show_mini_banner
+
+    local active
+    active=$(get_active_profile)
+
+    if [[ -z "$active" ]]; then
+        msg_info "No active profile tracked"
+        msg_info "Save your current session: ${BOLD}claude-switch save <name>${RST}"
+        echo ""
+        return
+    fi
+
+    echo -e "  ${BOLD}${ICO_BOLT} Current Session${RST}"
+    echo ""
+
+    get_profile_info "$active"
+    print_profile_card "$active" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "true" "$PROF_TOKEN"
+
+    # Live verification
+    echo ""
+    msg_step "Verifying with Claude API..."
+    if command -v claude &>/dev/null; then
+        local live_status
+        live_status=$(claude auth status --json 2>/dev/null || echo '{}')
+        local live_email
+        live_email=$(echo "$live_status" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('email','?'))" 2>/dev/null || echo "?")
+        local logged_in
+        logged_in=$(echo "$live_status" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('loggedIn', False))" 2>/dev/null || echo "False")
+
+        if [[ "$logged_in" == "True" ]]; then
+            msg_success "Session is ${BOLD}${GREEN}valid${RST} — logged in as ${CYAN}${live_email}${RST}"
+        else
+            msg_error "Session is ${BOLD}${RED}invalid${RST} — token may have expired"
+            msg_info "Try: ${BOLD}claude auth login${RST} then ${BOLD}claude-switch save ${active}${RST}"
+        fi
+    fi
+    echo ""
+}
+
+cmd_delete() {
+    local name="${1:-}"
+
+    show_mini_banner
+    ensure_profiles_dir
+
+    if [[ -z "$name" ]]; then
+        # Interactive: select profile to delete
+        local profile_arr=()
+        read -ra profile_arr <<< "$(get_profile_names)"
+
+        if [[ ${#profile_arr[@]} -eq 0 ]]; then
+            msg_warn "No profiles to delete"
+            exit 0
+        fi
+
+        local display_options=()
+        for p in "${profile_arr[@]}"; do
+            get_profile_info "$p"
+            display_options+=("${BOLD}${p}${RST}  ${DIM}${PROF_EMAIL}${RST}")
+        done
+
+        if interactive_select "${ICO_CROSS} Select profile to delete:" "${display_options[@]}"; then
+            name="${profile_arr[$SELECTED_INDEX]}"
+        else
+            exit 0
+        fi
+    fi
+
+    local profile_dir="$PROFILES_DIR/$name"
+    if [[ ! -d "$profile_dir" ]]; then
+        msg_error "Profile ${BOLD}'$name'${RST} not found!"
+        exit 1
+    fi
+
+    # Confirm
+    echo ""
+    get_profile_info "$name"
+    print_profile_card "$name" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "false" "$PROF_TOKEN"
+    echo ""
+
+    if ! confirm "${RED}Delete this profile?${RST}" "n"; then
+        msg_info "Cancelled"
+        exit 0
+    fi
+
+    local active
+    active=$(get_active_profile)
+    if [[ "$name" == "$active" ]]; then
+        rm -f "$ACTIVE_FILE"
+    fi
+
+    rm -rf "$profile_dir"
+    echo ""
+    msg_success "Profile ${BOLD}'$name'${RST} deleted"
+    echo ""
+}
+
+cmd_login() {
+    show_mini_banner
+
+    echo -e "  ${BOLD}${ICO_KEY} Add a new account${RST}"
+    echo ""
+
+    local active
+    active=$(get_active_profile)
+
+    # Auto-save current session if exists
+    if [[ -f "$CRED_FILE" && -n "$active" ]]; then
+        local current_dir="$PROFILES_DIR/$active"
+        mkdir -p "$current_dir"
+        cp "$CRED_FILE" "$current_dir/credentials.json"
+        if command -v claude &>/dev/null; then
+            claude auth status --json 2>/dev/null > "$current_dir/status.json" || true
+        fi
+        msg_info "Current profile '${BOLD}${active}${RST}' auto-saved"
+        echo ""
+    fi
+
+    msg_step "Opening Claude login..."
+    echo ""
+
+    # Run claude auth login
+    claude auth login
+
+    echo ""
+
+    # Ask for profile name
+    local name
+    name=$(input_prompt "${ICO_KEY} Save this account as" "")
+    if [[ -n "$name" ]]; then
+        cmd_save "$name"
+    else
+        msg_info "Skipped saving. You can save later with: ${BOLD}claude-switch save <name>${RST}"
+    fi
+}
+
+cmd_help() {
+    show_banner
+
+    echo -e "  ${BOLD}USAGE${RST}"
+    echo -e "    ${BWHITE}claude-switch${RST} ${DIM}[command] [options]${RST}"
+    echo ""
+    echo -e "  ${BOLD}COMMANDS${RST}"
+    echo ""
+    echo -e "    ${BCYAN}save${RST} ${DIM}<name>${RST}         Save current login as a named profile"
+    echo -e "    ${BCYAN}use${RST} ${DIM}[name]${RST}          Switch to a saved profile (interactive if no name)"
+    echo -e "    ${BCYAN}list${RST}               List all saved profiles with details"
+    echo -e "    ${BCYAN}status${RST}             Show active profile + live verification"
+    echo -e "    ${BCYAN}login${RST}              Login to a new account and save it"
+    echo -e "    ${BCYAN}delete${RST} ${DIM}[name]${RST}       Delete a saved profile (interactive if no name)"
+    echo -e "    ${BCYAN}help${RST}               Show this help message"
+    echo ""
+    echo -e "  ${BOLD}QUICK START${RST}"
+    echo ""
+    echo -e "    ${GRAY}# Step 1: Save your current (boss's) account${RST}"
+    echo -e "    ${GREEN}\$${RST} claude-switch save boss"
+    echo ""
+    echo -e "    ${GRAY}# Step 2: Login to your own account${RST}"
+    echo -e "    ${GREEN}\$${RST} claude-switch login"
+    echo ""
+    echo -e "    ${GRAY}# Step 3: Switch anytime${RST}"
+    echo -e "    ${GREEN}\$${RST} claude-switch use boss"
+    echo -e "    ${GREEN}\$${RST} claude-switch use personal"
+    echo ""
+    echo -e "    ${GRAY}# Or use interactive mode — just run:${RST}"
+    echo -e "    ${GREEN}\$${RST} claude-switch use"
+    echo ""
+    echo -e "  ${BOLD}HOW IT WORKS${RST}"
+    echo ""
+    echo -e "    Swaps ${ULINE}~/.claude/.credentials.json${RST} between saved snapshots."
+    echo -e "    ${GREEN}${ICO_CHECK}${RST} No logout required    ${GREEN}${ICO_CHECK}${RST} Zero dependencies"
+    echo -e "    ${GREEN}${ICO_CHECK}${RST} Auto-saves on switch  ${GREEN}${ICO_CHECK}${RST} Token expiry tracking"
+    echo ""
+}
+
+# Interactive mode (no args or just 'claude-switch')
+cmd_interactive() {
+    show_banner
+    ensure_profiles_dir
+
+    local options=(
+        "${ICO_SWAP}  Switch account"
+        "${ICO_KEY}  Save current session"
+        "${ICO_USER}  Login new account"
+        "${ICO_DOT}  List all profiles"
+        "${ICO_BOLT}  Check status"
+        "${ICO_CROSS}  Delete a profile"
+    )
+
+    if interactive_select "What would you like to do?" "${options[@]}"; then
+        echo ""
+        case $SELECTED_INDEX in
+            0) cmd_use ;;
+            1) cmd_save ;;
+            2) cmd_login ;;
+            3) cmd_list ;;
+            4) cmd_status ;;
+            5) cmd_delete ;;
+        esac
+    fi
+}
+
+# ── Main dispatch ──────────────────────────────────────────────
+
+main() {
+    case "${1:-}" in
+        save)          cmd_save "${2:-}" ;;
+        use|switch)    cmd_use "${2:-}" ;;
+        list|ls)       cmd_list ;;
+        status|whoami) cmd_status ;;
+        delete|rm)     cmd_delete "${2:-}" ;;
+        login|add)     cmd_login ;;
+        help|--help|-h) cmd_help ;;
+        --version|-v)  echo "claude-switch v${VERSION}" ;;
+        "")            cmd_interactive ;;
+        *)
+            msg_error "Unknown command: ${BOLD}$1${RST}"
+            echo ""
+            echo -e "  Run ${BOLD}claude-switch help${RST} for usage"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
