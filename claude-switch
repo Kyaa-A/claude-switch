@@ -90,6 +90,7 @@ ICO_SWAP="⇄"
 ICO_WARN="⚠"
 ICO_LOCK="🔒"
 ICO_STAR="★"
+ICO_CHAT="💬"
 
 # ── Claude brand colors (TrueColor with 256-color fallback) ────
 if $SUPPORTS_COLOR; then
@@ -253,12 +254,12 @@ show_banner() {
     echo -e "  ${CL1}${BOLD}      ▀███   ███▀  ▄▄▄    ${RST}  ${C2}${BOLD}CLAUDE-SWITCH${RST}  ${DIM}v${VERSION}${RST}"
     echo -e "  ${CL2}${BOLD}  ▄██▄ ▀███▄ ███  ████▀   ${RST}  ${DIM}Multi-account manager for Claude Code CLI${RST}"
     echo -e "  ${CL3}${BOLD}  ▀████▄▀███▄██▀▄███▀     ${RST}  ${DIM}─────────────────────────────────────────${RST}"
-    echo -e "  ${CL4}${BOLD}     ▀▀████████████   ▄▄▄▄${RST}  ${C3}▸${RST} ${DIM}version${RST}   ${CW}${BOLD}${VERSION}${RST} ${DIM}#stable${RST}"
-    echo -e "  ${CL5}${BOLD}▄▄▄▄▄▄▄▄▄████████████████▀${RST}  ${C3}▸${RST} ${DIM}repo${RST}      ${BCYAN}${ULINE}${GITHUB_URL}${RST}"
-    echo -e "  ${CL6}${BOLD} ▀▀▀▀▀▀▀▀▀███████████▄▄▄▄ ${RST}  ${C3}▸${RST} ${DIM}license${RST}   ${WHITE}MIT${RST}"
-    echo -e "  ${CL7}${BOLD}     ▄▄▄███████████▀▀▀▀▀█▀${RST}  ${C3}▸${RST} ${DIM}status${RST}    ${GREEN}●${RST} ${WHITE}ready${RST}"
+    echo -e "  ${CL4}${BOLD}     ▀▀████████████   ▄▄▄▄${RST}  ${C3}▸${RST} ${DIM}shared /resume${RST}  ${BGREEN}✔ all accounts access sessions${RST}"
+    echo -e "  ${CL5}${BOLD}▄▄▄▄▄▄▄▄▄████████████████▀${RST}  ${C3}▸${RST} ${DIM}version${RST}        ${CW}${BOLD}${VERSION}${RST} ${DIM}#stable${RST}"
+    echo -e "  ${CL6}${BOLD} ▀▀▀▀▀▀▀▀▀███████████▄▄▄▄ ${RST}  ${C3}▸${RST} ${DIM}repo${RST}           ${BCYAN}${ULINE}${GITHUB_URL}${RST}"
+    echo -e "  ${CL7}${BOLD}     ▄▄▄███████████▀▀▀▀▀█▀${RST}  ${C3}▸${RST} ${DIM}status${RST}         ${GREEN}●${RST} ${WHITE}ready${RST}"
     echo -e "  ${CL8}${BOLD}   ▄███▀ ▄███████████▄    ${RST}  ${DIM}─────────────────────────────────────────${RST}"
-    echo -e "  ${CL9}${BOLD}   ▀▀  ▄██▀ ██▀ ███▀▀▀█   ${RST}  ${DIM}Swaps credentials · Zero logout · Pure bash${RST}"
+    echo -e "  ${CL9}${BOLD}   ▀▀  ▄██▀ ██▀ ███▀▀▀█   ${RST}  ${DIM}Zero logout · Shared /resume · Pure bash${RST}"
     echo -e "  ${CL10}${BOLD}      ██▀  ███   ▀██      ${RST}"
     echo -e "  ${CL11}${BOLD}           ▀██            ${RST}"
     echo ""
@@ -436,11 +437,12 @@ print_profile_card() {
 
     echo -e "    ${border_color}┌$(repeat_char "─" $width)┐${RST}"
     echo -e "    ${border_color}│${RST}  ${name_color}${BOLD}${name}${RST}${active_badge}${token_badge}"
-    echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}email${RST}  ${BCYAN}${email}${RST}"
-    echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}plan${RST}   ${C3}${BOLD}${plan}${RST}"
+    echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}email${RST}   ${BCYAN}${email}${RST}"
+    echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}plan${RST}    ${C3}${BOLD}${plan}${RST}"
     if [[ "$org" != "unknown" && -n "$org" ]]; then
-        echo -e "    ${border_color}│${RST}  ${tree_color}└─${RST} ${C5}org${RST}    ${DIM}${org}${RST}"
+        echo -e "    ${border_color}│${RST}  ${tree_color}├─${RST} ${C5}org${RST}     ${DIM}${org}${RST}"
     fi
+    echo -e "    ${border_color}│${RST}  ${tree_color}└─${RST} ${C5}resume${RST}  ${BGREEN}shared across all profiles${RST}"
     echo -e "    ${border_color}└$(repeat_char "─" $width)┘${RST}"
 }
 
@@ -630,6 +632,10 @@ cmd_use() {
     get_profile_info "$name"
     print_profile_card "$name" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "true" "$PROF_TOKEN"
     echo ""
+
+    msg_info "All your conversation history is preserved!"
+    msg_info "Run ${BOLD}claude --resume${RST} or use ${BOLD}/resume${RST} to continue any chat."
+    echo ""
 }
 
 cmd_list() {
@@ -665,6 +671,11 @@ cmd_list() {
         print_profile_card "$pname" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "$is_active" "$PROF_TOKEN"
         echo ""
     done
+
+    local scount
+    scount=$(find "$CLAUDE_DIR/projects" -name "*.jsonl" 2>/dev/null | wc -l || echo "0")
+    echo -e "  ${C3}${ICO_CHAT} Shared Sessions:${RST} ${BOLD}${scount}${RST} conversations available to ${BOLD}/resume${RST}"
+    echo ""
 }
 
 cmd_list_compact() {
