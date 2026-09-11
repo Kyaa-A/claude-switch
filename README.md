@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>Switch between multiple Claude Code accounts without logging out. Zero dependencies. Pure bash.</b>
+  <b>Seamlessly switch between multiple Claude Code accounts across different companies, clients, or organizations without logging out. Zero dependencies. Pure bash.</b>
 </p>
 
 <p align="center">
@@ -33,20 +33,24 @@
 
 ## 🎯 The Problem
 
-You have access to a Claude CLI account (e.g. your boss's or client's) but **no access to their web account or email** — so running `/logout` means you lose access forever.
+When working across multiple companies, clients, or projects, each organization often provisions its own dedicated Claude Code account or subscription. 
 
-At the same time, you want to use **your own personal Claude account** on the same machine. Claude CLI has no built-in multi-profile or multi-account support.
+Switching between them is painful:
+- Running `/logout` tears down your active CLI session and invalidates local tokens.
+- You must constantly open a browser and re-authenticate every time you change projects.
+- If you're using an account provisioned on your machine without direct access to the web credentials/SSO dashboard, logging out means losing access.
+- Claude CLI has no native support for multi-account or multi-org profiles.
 
 ## ⚡ The Solution
 
-`claude-switch` takes snapshots of your auth credentials and swaps them on the fly.
+`claude-switch` manages secure local credential snapshots and swaps them instantly.
 
-- **No logout ever** — your sessions and refresh tokens stay valid
-- **Authentic Claude terminal UI** — Claude starburst logo in warm terracotta gradients
-- **TrueColor + 256-color** — auto-detects 24-bit RGB and graceful fallbacks
-- **Interactive TUI** — arrow keys (`↑`/`↓`) and vim keys (`j`/`k`) navigation
-- **Auto-save on switch** — current session is automatically backed up before switching
-- **Session expiry tracking** — know exactly how many days your credentials remain valid
+- **Zero logout required** — all saved sessions and refresh tokens remain valid
+- **Authentic Claude terminal UI** — recognizable Claude starburst logo in warm terracotta gradients
+- **TrueColor + 256-color** — auto-detects 24-bit RGB with graceful fallbacks
+- **Interactive TUI** — navigate with arrow keys (`↑`/`↓`) or vim keys (`j`/`k`)
+- **Auto-save on switch** — current credentials are automatically backed up before loading a new profile
+- **Session expiry tracking** — monitors refresh token validity so you know when sessions need refreshing
 - **Zero dependencies** — pure bash, works out-of-the-box on Linux & macOS
 
 ---
@@ -86,15 +90,18 @@ At the same time, you want to use **your own personal Claude account** on the sa
 
   QUICK START
 
-    # Step 1: Save your current account (e.g. boss)
-    $ claude-switch save boss
+    # Step 1: Save current company account
+    $ claude-switch save company1
 
-    # Step 2: Login to your own account
+    # Step 2: Login to another company account
     $ claude-switch login
 
-    # Step 3: Switch anytime
-    $ claude-switch use boss
-    $ claude-switch use personal
+    # Step 3: Save second company account
+    $ claude-switch save company2
+
+    # Step 4: Switch anytime
+    $ claude-switch use company1
+    $ claude-switch use company2
 
     # Or use interactive mode — just run:
     $ claude-switch use
@@ -112,17 +119,17 @@ At the same time, you want to use **your own personal Claude account** on the sa
   🔑 Saved Profiles (2 total)
 
     ┌────────────────────────────────────────────────────────┐
-    │  boss  ⚡ ACTIVE  🔒 26d remaining
-    │  ├─ email  boss@company.com
+    │  company1  ⚡ ACTIVE  🔒 26d remaining
+    │  ├─ email  dev@company1.com
     │  ├─ plan   max
-    │  └─ org    Acme Corp
+    │  └─ org    Company One Inc.
     └────────────────────────────────────────────────────────┘
 
     ┌────────────────────────────────────────────────────────┐
-    │  personal
-    │  ├─ email  me@gmail.com
+    │  company2
+    │  ├─ email  eng@company2.io
     │  ├─ plan   pro
-    │  └─ org    Personal
+    │  └─ org    Company Two Technologies
     └────────────────────────────────────────────────────────┘
 ```
 
@@ -138,14 +145,14 @@ At the same time, you want to use **your own personal Claude account** on the sa
   ⚡ Current Session
 
     ┌────────────────────────────────────────────────────────┐
-    │  boss  ⚡ ACTIVE  🔒 26d remaining
-    │  ├─ email  boss@company.com
+    │  company1  ⚡ ACTIVE  🔒 26d remaining
+    │  ├─ email  dev@company1.com
     │  ├─ plan   max
-    │  └─ org    Acme Corp
+    │  └─ org    Company One Inc.
     └────────────────────────────────────────────────────────┘
 
   [>] Verifying with Claude API...
-  [+] Session is valid — logged in as boss@company.com
+  [+] Session is valid — logged in as dev@company1.com
 ```
 
 ### Interactive Switcher (`claude-switch use`)
@@ -160,9 +167,9 @@ At the same time, you want to use **your own personal Claude account** on the sa
   ⇄ Select account to switch to:
   Use ↑↓ arrows (or j/k) to navigate, Enter to select, q to cancel
 
-  ❯ boss        boss@company.com  [max]  (active)
-    personal    me@gmail.com      [pro]
-    client      dev@agency.co     [team]
+  ❯ company1    dev@company1.com  [max]  (active)
+    company2    eng@company2.io   [pro]
+    personal    me@gmail.com      [max]
 ```
 
 ---
@@ -190,23 +197,23 @@ cp claude-switch ~/.local/bin/
 
 ## 📖 3-Step Setup Guide
 
-### 1. Save your current account
+### 1. Save your current company account
 ```bash
-claude-switch save boss
+claude-switch save company1
 ```
-*This takes a secure snapshot of your current login credentials.*
+*Creates a snapshot of your current credentials.*
 
-### 2. Login to your secondary account
+### 2. Login to your other company or personal account
 ```bash
 claude-switch login
 ```
-*This safely auto-saves the current session first, opens browser login, and prompts you for a profile name (e.g. `personal`).*
+*Safely auto-saves the current session first, launches the login flow, and prompts you for a profile name (e.g. `company2` or `personal`).*
 
 ### 3. Switch anytime!
 ```bash
-claude-switch use boss       # switch to boss
-claude-switch use personal   # switch to personal
-claude-switch use            # or open interactive picker with arrow keys!
+claude-switch use company1     # switch to company1
+claude-switch use company2     # switch to company2
+claude-switch use              # or open interactive picker with arrow keys!
 ```
 
 ---
@@ -239,16 +246,16 @@ Claude CLI stores OAuth credentials in:
 ├── .credentials.json          ← active credentials read by Claude CLI
 └── .profiles/
     ├── .active                ← active profile marker
-    ├── boss/
+    ├── company1/
     │   ├── credentials.json   ← backed-up credentials snapshot
     │   └── status.json        ← cached account metadata (email, plan)
-    └── personal/
+    └── company2/
         ├── credentials.json
         └── status.json
 ```
 
 When you run `claude-switch use <name>`:
-1. It auto-saves your current `~/.claude/.credentials.json` back to your active profile snapshot so no tokens or session refreshes are lost.
+1. It auto-saves your current `~/.claude/.credentials.json` back to your active profile snapshot so refreshed tokens are never lost.
 2. It copies the target profile's `credentials.json` to `~/.claude/.credentials.json`.
 3. It updates `~/.claude/.profiles/.active`.
 4. Claude CLI immediately recognizes the switched account.
@@ -257,17 +264,17 @@ When you run `claude-switch use <name>`:
 
 ## ❓ Frequently Asked Questions
 
-#### Will this log out my boss or client?
-**No.** `claude-switch` never runs `claude auth logout`. It only swaps local token snapshot files. The server-side session remains valid.
+#### Will switching log out my other company accounts?
+**No.** `claude-switch` never executes `claude auth logout`. It only swaps local token snapshots. All server-side sessions remain active and untouched.
 
-#### Do the accounts share conversation history?
-**No.** Each account has its own isolated conversation history on Anthropic's servers. Switching accounts gives you only that account's chats and resumes.
+#### Do different company accounts share conversation history?
+**No.** Each company account has its own completely isolated conversation history on Anthropic's servers. Switching accounts ensures no cross-company chat leakage.
 
 #### How does token expiry work?
-Claude CLI OAuth tokens include a short-lived access token and a long-lived refresh token (~30 days). Claude CLI automatically refreshes the access token when you use it. `claude-switch` tracks the refresh token validity and warns you when a session is nearing expiry.
+Claude CLI OAuth tokens include a short-lived access token and a long-lived refresh token (~30 days). Claude CLI automatically refreshes the access token when you use it. `claude-switch` monitors the refresh token expiry and warns you when a session needs renewal.
 
 #### What if a session expires?
-Simply switch to that profile (`claude-switch use <name>`), run `claude auth login`, and run `claude-switch save <name>` to refresh the snapshot.
+Switch to that profile (`claude-switch use <name>`), run `claude auth login`, and run `claude-switch save <name>` to refresh the snapshot.
 
 #### Are any dependencies required?
 **None.** It's 100% pure bash. Python3 is optional for JSON parsing and token expiry calculations (falls back gracefully if not installed).
