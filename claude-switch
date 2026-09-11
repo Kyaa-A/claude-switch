@@ -306,7 +306,7 @@ try:
             u = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            print('  \033[31m[-] Session expired (HTTP 401). Re-login needed for this profile.\033[0m')
+            print('  \033[33m[!] Token inactive (switch with claude-switch use to activate)\033[0m')
         else:
             print(f'  \033[31m[-] Usage query failed: HTTP {e.code}\033[0m')
         exit(0)
@@ -686,8 +686,8 @@ def get_profile_data(pname):
                 r3 = f'\033[2mresets {p_time} · {s_time}\033[0m'
         except urllib.error.HTTPError as e:
             if e.code == 401:
-                r1 = '\033[33m⚡ usage: session expired\033[0m'
-                r2 = '\033[2m(run claude login to refresh)\033[0m'
+                r1 = '\033[33musage: token inactive\033[0m'
+                r2 = '\033[2m(switch to activate)\033[0m'
             elif e.code == 429:
                 r1 = '\033[33m⚡ usage: rate limited\033[0m'
                 r2 = '\033[2m(try again shortly)\033[0m'
@@ -1093,9 +1093,12 @@ cmd_usage() {
         read -ra profile_arr <<< "$(get_profile_names)"
         for p in "${profile_arr[@]}"; do
             local cred_file="$PROFILES_DIR/$p/credentials.json"
-            get_profile_info "$p"
             local is_act="false"
-            [[ "$p" == "$active" ]] && is_act="true"
+            if [[ "$p" == "$active" ]]; then
+                is_act="true"
+                [[ -f "$CRED_FILE" ]] && cred_file="$CRED_FILE"
+            fi
+            get_profile_info "$p"
             print_profile_card "$p" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "$is_act" "$PROF_TOKEN"
             echo ""
             show_claude_usage "$p" "$cred_file"
@@ -1115,9 +1118,13 @@ cmd_usage() {
         return 1
     fi
 
-    get_profile_info "$target"
     local is_act="false"
-    [[ "$target" == "$active" ]] && is_act="true"
+    if [[ "$target" == "$active" ]]; then
+        is_act="true"
+        [[ -f "$CRED_FILE" ]] && cred_file="$CRED_FILE"
+    fi
+
+    get_profile_info "$target"
     print_profile_card "$target" "$PROF_EMAIL" "$PROF_PLAN" "$PROF_ORG" "$is_act" "$PROF_TOKEN"
     echo ""
     show_claude_usage "$target" "$cred_file"
