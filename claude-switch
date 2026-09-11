@@ -847,6 +847,7 @@ cmd_rename() {
 
 cmd_login() {
     show_mini_banner
+    ensure_profiles_dir
 
     echo -e "  ${BOLD}${ICO_KEY} Add a new account${RST}"
     echo ""
@@ -854,16 +855,28 @@ cmd_login() {
     local active
     active=$(get_active_profile)
 
-    # Auto-save current session if exists
-    if [[ -f "$CRED_FILE" && -n "$active" ]]; then
-        local current_dir="$PROFILES_DIR/$active"
-        mkdir -p "$current_dir"
-        cp "$CRED_FILE" "$current_dir/credentials.json"
-        if command -v claude &>/dev/null; then
-            claude auth status --json 2>/dev/null > "$current_dir/status.json" || true
+    # Auto-save current session if exists so you NEVER lose it!
+    if [[ -f "$CRED_FILE" ]]; then
+        if [[ -n "$active" ]]; then
+            local current_dir="$PROFILES_DIR/$active"
+            mkdir -p "$current_dir"
+            cp "$CRED_FILE" "$current_dir/credentials.json"
+            if command -v claude &>/dev/null; then
+                claude auth status --json 2>/dev/null > "$current_dir/status.json" || true
+            fi
+            msg_info "Current profile '${BOLD}${active}${RST}' auto-saved"
+            echo ""
+        else
+            # Existing unsaved login detected — protect it first!
+            msg_warn "Existing active Claude session detected!"
+            msg_info "Saving your current session first so you don't lose it..."
+            echo ""
+            local prev_name
+            prev_name=$(input_prompt "Name for your current logged-in account" "work")
+            prev_name="${prev_name:-work}"
+            cmd_save "$prev_name"
+            echo ""
         fi
-        msg_info "Current profile '${BOLD}${active}${RST}' auto-saved"
-        echo ""
     fi
 
     msg_step "Opening Claude login..."
@@ -876,7 +889,7 @@ cmd_login() {
 
     # Ask for profile name
     local name
-    name=$(input_prompt "${ICO_KEY} Save this account as" "")
+    name=$(input_prompt "${ICO_KEY} Save new account as" "")
     if [[ -n "$name" ]]; then
         cmd_save "$name"
     else
