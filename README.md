@@ -1,4 +1,4 @@
-# 🔑 claude-switch
+# claude-switch
 
 **Multi-account manager for [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code).**
 
@@ -8,33 +8,139 @@ Switch between multiple Claude accounts without logging out. Zero dependencies. 
   <img src="https://img.shields.io/badge/bash-pure-green?style=flat-square" alt="Pure Bash">
   <img src="https://img.shields.io/badge/dependencies-zero-blue?style=flat-square" alt="Zero Dependencies">
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="MIT License">
+  <img src="https://img.shields.io/badge/version-1.1.0-purple?style=flat-square" alt="Version">
 </p>
 
 ---
 
 ## The Problem
 
-You have access to your boss's Claude CLI account but **no access to the website** — so you can't risk `/logout`. You also want to use your own account. Claude CLI doesn't support multiple profiles.
+You have access to someone's Claude CLI account but **no access to the website** — so you can't risk `/logout`. You also want to use your own account. Claude CLI doesn't support multiple profiles.
 
 ## The Solution
 
 `claude-switch` saves credential snapshots and swaps them instantly. No logout. No risk. No dependencies.
 
-```
-  claude-switch — Multi-account manager for Claude Code CLI
+## 🖥️ What It Looks Like
 
-  ╭────────────────────────────────────────────────────────╮
-  │  👤 boss   ACTIVE   🔒 45d left                       │
-  │  Email  skylersberry@gmail.com                         │
-  │  Plan   max                                            │
-  ╰────────────────────────────────────────────────────────╯
+### `claude-switch help`
 
-  ╭────────────────────────────────────────────────────────╮
-  │  👤 personal                                           │
-  │  Email  myemail@gmail.com                              │
-  │  Plan   pro                                            │
-  ╰────────────────────────────────────────────────────────╯
 ```
+     _                 _                          _ _       _
+ ___| | __ _ _   _  __| | ___       _____      _(_) |_ ___| |__
+/ __| |/ _` | | | |/ _` |/ _ \_____/ __\ \ /\ / / | __/ __| '_ \
+| (__| | (_| | |_| | (_| |  __/_____\__ \\ V  V /| | || (__| | | |
+ \___|_|\__,_|\__,_|\__,_|\___|     |___/ \_/\_/ |_|\__\___|_| |_|
+
+            [!] Multi-account manager for Claude Code CLI
+
+ │ version  1.1.0#stable
+ │ home     https://github.com/Kyaa-A/claude-switch
+ │ license  MIT
+
+────────────────────────────────────────────────────────────
+
+USAGE
+  claude-switch [command] [options]
+
+COMMANDS
+
+  save <name>         Save current login as a named profile
+  use [name]          Switch to a saved profile (interactive if no name)
+  list               List all saved profiles with details
+  status             Show active profile + live verification
+  login              Login to a new account and save it
+  delete [name]       Delete a saved profile (interactive if no name)
+  help               Show this help message
+
+QUICK START
+
+  # Step 1: Save your current (boss's) account
+  $ claude-switch save boss
+
+  # Step 2: Login to your own account
+  $ claude-switch login
+
+  # Step 3: Switch anytime
+  $ claude-switch use boss
+  $ claude-switch use personal
+
+  # Or use interactive mode — just run:
+  $ claude-switch use
+```
+
+### `claude-switch list`
+
+```
+     _                 _                          _ _       _
+ ___| | __ _ _   _  __| | ___       _____      _(_) |_ ___| |__
+/ __| |/ _` | | | |/ _` |/ _ \_____/ __\ \ /\ / / | __/ __| '_ \
+| (__| | (_| | |_| | (_| |  __/_____\__ \\ V  V /| | || (__| | | |
+ \___|_|\__,_|\__,_|\__,_|\___|     |___/ \_/\_/ |_|\__\___|_| |_|
+
+            [!] v1.1.0 — https://github.com/Kyaa-A/claude-switch
+
+🔑 Saved Profiles (2 total)
+
+  ┌────────────────────────────────────────────────────────┐
+  │  boss  [ACTIVE]  [🔒 45d remaining]
+  │  ├─ email  boss@company.com
+  │  ├─ plan   max
+  │  └─ org    Company Inc.
+  └────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────┐
+  │  personal
+  │  ├─ email  me@gmail.com
+  │  ├─ plan   pro
+  │  └─ org    Personal
+  └────────────────────────────────────────────────────────┘
+```
+
+### `claude-switch status`
+
+```
+     _                 _                          _ _       _
+ ___| | __ _ _   _  __| | ___       _____      _(_) |_ ___| |__
+/ __| |/ _` | | | |/ _` |/ _ \_____/ __\ \ /\ / / | __/ __| '_ \
+| (__| | (_| | |_| | (_| |  __/_____\__ \\ V  V /| | || (__| | | |
+ \___|_|\__,_|\__,_|\__,_|\___|     |___/ \_/\_/ |_|\__\___|_| |_|
+
+            [!] v1.1.0 — https://github.com/Kyaa-A/claude-switch
+
+⚡ Current Session
+
+  ┌────────────────────────────────────────────────────────┐
+  │  boss  [ACTIVE]  [🔒 45d remaining]
+  │  ├─ email  boss@company.com
+  │  ├─ plan   max
+  │  └─ org    Company Inc.
+  └────────────────────────────────────────────────────────┘
+
+  [>] Verifying with Claude API...
+  [+] Session is valid — logged in as boss@company.com
+```
+
+### `claude-switch use` (Interactive Mode)
+
+```
+     _                 _                          _ _       _
+ ___| | __ _ _   _  __| | ___       _____      _(_) |_ ___| |__
+/ __| |/ _` | | | |/ _` |/ _ \_____/ __\ \ /\ / / | __/ __| '_ \
+| (__| | (_| | |_| | (_| |  __/_____\__ \\ V  V /| | || (__| | | |
+ \___|_|\__,_|\__,_|\__,_|\___|     |___/ \_/\_/ |_|\__\___|_| |_|
+
+            [!] v1.1.0 — https://github.com/Kyaa-A/claude-switch
+
+  ⇄ Select account to switch to:
+  Use ↑↓ arrows to navigate, Enter to select, q to cancel
+
+  ❯ boss        boss@company.com  [max]  (active)
+    personal    me@gmail.com      [pro]
+    client      dev@client.co     [team]
+```
+
+---
 
 ## ⚡ Quick Start
 
@@ -42,7 +148,7 @@ You have access to your boss's Claude CLI account but **no access to the website
 
 ```bash
 # One-line install
-curl -fsSL https://raw.githubusercontent.com/user/claude-switch/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Kyaa-A/claude-switch/main/install.sh | bash
 ```
 
 Or manually:
@@ -51,9 +157,9 @@ Or manually:
 git clone https://github.com/Kyaa-A/claude-switch.git
 cd claude-switch
 chmod +x claude-switch
-sudo ln -sf "$(pwd)/claude-switch" /usr/local/bin/claude-switch
-# or
 cp claude-switch ~/.local/bin/
+# or
+sudo ln -sf "$(pwd)/claude-switch" /usr/local/bin/claude-switch
 ```
 
 ### Setup (30 seconds)
@@ -71,15 +177,22 @@ claude-switch use boss
 claude-switch use personal
 ```
 
-## 📖 Usage
+## 📖 Commands
 
-### Interactive Mode
+| Command | Description |
+|---------|-------------|
+| `claude-switch` | Interactive menu (no args) |
+| `claude-switch save <name>` | Save current login as a named profile |
+| `claude-switch use [name]` | Switch to a profile (interactive picker if no name) |
+| `claude-switch list` | List all saved profiles with details |
+| `claude-switch status` | Show active profile + live API verification |
+| `claude-switch login` | Login to a new account and save it |
+| `claude-switch delete [name]` | Delete a profile (interactive picker if no name) |
+| `claude-switch help` | Show help with banner |
 
-Just run `claude-switch` with no arguments for a full interactive menu:
+### Interactive Menu
 
-```bash
-claude-switch
-```
+Just run `claude-switch` with no arguments:
 
 ```
   ❯ ⇄  Switch account
@@ -90,36 +203,7 @@ claude-switch
     ✘  Delete a profile
 ```
 
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `claude-switch` | Interactive menu |
-| `claude-switch save <name>` | Save current login as a named profile |
-| `claude-switch use [name]` | Switch to a profile (interactive picker if no name) |
-| `claude-switch list` | List all saved profiles with details |
-| `claude-switch status` | Show active profile + live API verification |
-| `claude-switch login` | Login to a new account and save it |
-| `claude-switch delete [name]` | Delete a profile (interactive picker if no name) |
-
-### Examples
-
-```bash
-# Save current session
-claude-switch save work
-
-# Interactive switch (arrow keys)
-claude-switch use
-
-# Direct switch
-claude-switch use personal
-
-# Check who you're logged in as
-claude-switch status
-
-# See all profiles
-claude-switch list
-```
+Navigate with **↑↓ arrows** or **j/k** (vim keys), **Enter** to select, **q** to cancel.
 
 ## 🔧 How It Works
 
@@ -149,22 +233,22 @@ Claude CLI stores OAuth credentials in `~/.claude/.credentials.json`. This tool:
 **No.** The tool never calls `claude auth logout`. It only copies and swaps credential files.
 
 ### Do profiles share sessions/conversations?
-**No.** Each account has its own separate conversation history. When you switch profiles, you only see that account's sessions.
+**No.** Each account has its own separate conversation history. Switching profiles = switching who you're logged in as.
 
 ### What if a token expires?
-Run `claude auth login` while on that profile, then `claude-switch save <name>` to update the saved credentials.
+Run `claude auth login` while on that profile, then `claude-switch save <name>` to update.
 
 ### Does it need any dependencies?
-**No.** Pure bash. Works on macOS and Linux. Python3 is optional (used for JSON parsing and token expiry display — falls back gracefully if missing).
+**No.** Pure bash. Works on macOS and Linux. Python3 is optional (used for JSON parsing — falls back gracefully).
 
-### Can I use this with API keys instead of OAuth?
-This tool is designed for OAuth-based auth (the default `claude auth login` flow). For API keys, you can just set `ANTHROPIC_API_KEY` env variable — no switching tool needed.
+### Can I use this with API keys?
+This tool is for OAuth-based auth (`claude auth login`). For API keys, just set `ANTHROPIC_API_KEY` — no switching tool needed.
 
 ## 🗑️ Uninstall
 
 ```bash
 # Remove the command
-rm -f /usr/local/bin/claude-switch  # or ~/.local/bin/claude-switch
+rm -f ~/.local/bin/claude-switch  # or /usr/local/bin/claude-switch
 
 # Remove saved profiles (optional — doesn't affect your Claude login)
 rm -rf ~/.claude/.profiles
